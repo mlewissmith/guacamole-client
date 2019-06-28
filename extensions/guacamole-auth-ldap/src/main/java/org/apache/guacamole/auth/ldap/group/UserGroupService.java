@@ -33,6 +33,7 @@ import org.apache.guacamole.GuacamoleException;
 import org.apache.guacamole.auth.ldap.ObjectQueryService;
 import org.apache.guacamole.net.auth.UserGroup;
 import org.apache.guacamole.net.auth.simple.SimpleUserGroup;
+import org.apache.guacamole.auth.ldap.user.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,12 @@ public class UserGroupService {
      */
     @Inject
     private ObjectQueryService queryService;
+
+    /**
+     * Service for retrieving users and their corresponding LDAP DNs.
+     */
+    @Inject
+    private UserService userService;
 
     /**
      * Returns the base search filter which should be used to retrieve user
@@ -165,6 +172,21 @@ public class UserGroupService {
         if (groupBaseDN == null)
             return Collections.emptyList();
 
+        // memberAttribute specified in properties could contain DN or username 
+        String memberAttribute = confService.getMemberAttribute();
+        String memberAttributeType = confService.getMemberAttributeType();
+        String userID;
+        switch (memberAttributeType) {
+            case "uid":
+                userID = userService.getUidFromUserDN(ldapConnection, userDN);
+                break;
+            case "dn": // fallthru
+            default:
+                userID = userDN;
+                break;
+        }
+
+
         // Get all groups the user is a member of starting at the groupBaseDN,
         // excluding guacConfigGroups
         return queryService.search(
@@ -172,7 +194,7 @@ public class UserGroupService {
             groupBaseDN,
             getGroupSearchFilter(),
             Collections.singleton(confService.getMemberAttribute()),
-            userDN
+            userID
         );
 
     }
