@@ -20,6 +20,8 @@
 package org.apache.guacamole.auth.ldap.user;
 
 import com.google.inject.Inject;
+import com.novell.ldap.LDAPAttribute;
+import com.novell.ldap.LDAPAttributeSet;
 import com.novell.ldap.LDAPConnection;
 import com.novell.ldap.LDAPEntry;
 import java.util.ArrayList;
@@ -188,4 +190,64 @@ public class UserService {
 
     }
 
+    /**
+     * Determine the username which corresponds to the user having the given DN.
+     * Assume that a userDN record contains at least one attribute identifying a
+     * username, and that if it contains more than one such attribute then it's
+     * the SAME username.  
+     * Also assume that each attribute contains single value, not array.
+     * 
+     * @param ldapConnection
+     *     The current connection to the LDAP server, associated with the
+     *     current user.
+     *
+     * @param userDN     
+     *     The DN of the user whose username should be retrieved.
+     *
+     * @return
+     *     The username which corresponds to the user having the given DN.
+     *
+     * @throws GuacamoleException
+     *     If required properties are missing, and thus the user DN cannot be
+     *     determined.
+     */
+    public String getUidFromUserDN(LDAPConnection ldapConnection,
+            String userDN) throws GuacamoleException {
+
+        // Retrieve user objects with userDN
+        List<LDAPEntry> userEntries = queryService.search(
+            ldapConnection,
+            userDN,
+            confService.getUserSearchFilter());
+        // ... there can surely only be one
+        if (userEntries.size() != 1) {
+            logger.warn("user DN '{}' does not return unique value and will be ignored",
+                userDN);
+            return null;
+        }
+        LDAPEntry userEntry = userEntries.get(0);
+
+        // Pull username attribute(s) from properties
+        List<String> usernameAttributes = confService.getUsernameAttributes();
+
+        // get the attributes present in user's record
+        LDAPAttributeSet attrSet = userEntry.getAttributeSet();
+        // for each attribute specified in properties...
+        for (String attrName : usernameAttributes) {
+            // ... does it exist in user's record?
+            LDAPAttribute attr = new LDAPAttribute(attrName);
+            if (!attrSet.contains(attr)) {
+                // attribute specified in properties does not exist in user's record
+                continue;
+            }
+            // attribute exists
+            String uid = userEntry.getAttribute(attrName).getStringValue();
+            if (uid != null) {
+                // found something! return it
+                return uid;
+            }
+        }
+        // found no usernames in record.  How can this user log in?
+        return null;
+    }
 }
