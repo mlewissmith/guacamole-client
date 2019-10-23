@@ -46,7 +46,8 @@ public abstract class MemberAttributeTypeProperty implements GuacamoleProperty<M
             return MemberAttributeType.UID;
 
         // The provided value is not legal
-        throw new GuacamoleServerException("Member attribute type must be one of \"dn\" or \"uid\".");
+        throw new GuacamoleServerException("Member attribute type must be "
+                          + "one of \"dn\" or \"uid\".");
 
     }
 
